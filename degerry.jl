@@ -95,8 +95,8 @@ end
 
 # Load data
 using CSV
-WI_votes = CSV.read("data/Gerrymander County_election_data.csv")
-WI_contiguity = CSV.read("data/Gerrymander County_contiguity.csv", rows = 73)
+WI_votes = CSV.read("/home/tpatricksullivan/gerry/data/Gerrymander County_election_data.csv")
+WI_contiguity = CSV.read("/home/tpatricksullivan/gerry/data/Gerrymander County_contiguity.csv", rows = 73)
 
 WI_V = convert(Array, WI_votes[:,3:4])
 WI_C = convert(Array, WI_contiguity[:,2:73])
