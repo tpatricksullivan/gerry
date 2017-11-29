@@ -1,9 +1,11 @@
-using JuMP, Gurobi
+using JuMP, Gurobi, Cbc
+
 function degerry(
     votes,
     contiguity_matrix, 
     number_districts,
-    common_size_threshold = 0.2
+    common_size_threshold = 0.2; 
+    solver = "Cbc"
     )
     
     _V = votes
@@ -18,8 +20,15 @@ function degerry(
         throw(ArgumentError("Contiguity matrix is not valid. It must be symmetric."))
     end
     
-    #m = Model(solver = CbcSolver())
-    m = Model(solver = GurobiSolver(Presolve=0))
+    if !(solver in ["Cbc","Gurobi"])
+        throw(ArgumentError(string(solver, " is not a valid solver choice. Must be either Cbc or Gurobi")))
+    end
+    
+    if solver == "Cbc"
+        m = Model(solver = CbcSolver())
+    else
+        m = Model(solver = GurobiSolver(Presolve=0))
+    end
     
     ## Variables
 
@@ -58,10 +67,10 @@ function degerry(
     # These constraints enforce roughly equal sizes. 
     @variable(m, common_size) # this approach is too slow
     fixed_common_size = sum(_V) / districts
-    # @constraint(m, (D' * _V) * [1;1] .>= fixed_common_size * (1-common_size_threshold))
+    # @constraint(m, (D' * _V) * [1;1] .>= fixed_common_size * (1-common_size_threshold)) # we don't really need this
     @constraint(m, (D' * _V) * [1;1] .<= fixed_common_size * (1+common_size_threshold))
 
-    # These constraints enforce contiguity
+    # These constraints enforce contiguity, but we need to allow districts with only one block
     @variable(m, 0 <= multi_block_districts[i=1:districts] <= 1, Bin)
     @constraint(m, multi_block_districts .>= 0 )
     @constraint(m, M * multi_block_districts' .>= ones(1,blocks) * D - ones(1,districts) )
@@ -86,12 +95,15 @@ function degerry(
         ("Votes By District", getvalue(D)' * _V), 
         ("Common Size", getvalue(common_size)), 
         ("Fixed Common Size", fixed_common_size), 
-        ("District Assignments", getvalue(D))
+        ("District Assignments", getvalue(D)), 
+        ("Total Vote Share", sum(getvalue(D)' * _V,1) ), 
+        ("Total Seat Share", sum( getvalue(D)' * _V .>= repmat(maximum((getvalue(D)' * _V),2),1,2), 1)  ), 
+        ("Number of blocks in each district", sum(getvalue(D),1) ), 
+        ("Total votes in each district", getvalue(D)' * _V * [1;1] )
     ])
     
     return res
 end
-
 
 # Load data
 using CSV
